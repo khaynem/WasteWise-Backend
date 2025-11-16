@@ -39,7 +39,7 @@ exports.signup = async (req, res) => {
         });
         await user.save();
 
-        const backendBase = process.env.BACKEND_URL || 'http://localhost:3001';
+        const backendBase = process.env.BACKEND_URL;
         const verifyLink = `${backendBase.replace(/\/+$/,'')}/api/auth/verify-email/${emailToken}`;
 
         console.log('[SIGNUP] Created user:', user._id.toString(), 'Email token:', emailToken);
