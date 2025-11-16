@@ -25,7 +25,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser()); 
 
 app.use((req, res, next) => {
-  const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  const allowedOrigins = [process.env.FRONTEND_URL];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
