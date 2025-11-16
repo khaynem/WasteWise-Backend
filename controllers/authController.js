@@ -138,24 +138,44 @@ exports.login = async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        // Cookie options that survive navigation and cross-subdomain use
+        // Enhanced cookie options
         const isProd = process.env.NODE_ENV === 'production';
-        const cookieOptions = {
-            httpOnly: true,                                      // prevent JS access
-            sameSite: process.env.COOKIE_SAMESITE || (isProd ? 'None' : 'Lax'),
-            secure: (process.env.COOKIE_SECURE === 'true') || isProd, // required when SameSite=None
-            path: '/',
-            maxAge: 24 * 60 * 60 * 1000
-        };
+        
+        // Detect protocol behind proxies (Cloudflare, nginx, etc.)
+        const proto = String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')).toLowerCase();
+        
+        // Check if request is cross-origin
+        const originHost = (() => {
+            try { return new URL(req.headers.origin || '').hostname; } catch { return ''; }
+        })();
+        const isCrossSite = Boolean(originHost && originHost !== req.hostname);
 
-        // In production, set a parent domain like ".wastewise.ph"
+        // SameSite strategy: cross-site requires 'None', same-site use 'Lax'
+        const sameSite = process.env.COOKIE_SAMESITE || (isCrossSite ? 'None' : 'Lax');
+        
+        // Secure flag: required for SameSite=None, or when using HTTPS
+        const secure = (process.env.COOKIE_SECURE === 'true') || proto === 'https' || isProd;
+
+        // Domain: normalize for subdomain sharing (e.g., .wastewise.ph)
+        let domain;
         if (process.env.COOKIE_DOMAIN && process.env.COOKIE_DOMAIN !== 'localhost') {
-            cookieOptions.domain = process.env.COOKIE_DOMAIN; // e.g., ".wastewise.ph"
+            domain = process.env.COOKIE_DOMAIN.startsWith('.')
+                ? process.env.COOKIE_DOMAIN
+                : `.${process.env.COOKIE_DOMAIN}`;
         }
+
+        const cookieOptions = {
+            httpOnly: true,
+            sameSite,
+            secure,
+            path: '/',
+            maxAge: 24 * 60 * 60 * 1000,
+            ...(domain ? { domain } : {})
+        };
 
         res.cookie('authToken', token, cookieOptions);
 
-        console.log('[LOGIN] Set auth cookie for user:', user._id.toString(), 'token len:', token.length);
+        console.log('[LOGIN] Set cookie for user:', user._id.toString(), 'Options:', JSON.stringify(cookieOptions));
 
         return res.status(200).json({
             message: 'Login successful',
