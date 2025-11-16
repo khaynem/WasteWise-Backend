@@ -138,13 +138,22 @@ exports.login = async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        res.cookie('authToken', token, {
-            httpOnly: false,
-            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-            secure: process.env.NODE_ENV === 'production',
+        // Cookie options that survive navigation and cross-subdomain use
+        const isProd = process.env.NODE_ENV === 'production';
+        const cookieOptions = {
+            httpOnly: true,                                      // prevent JS access
+            sameSite: process.env.COOKIE_SAMESITE || (isProd ? 'None' : 'Lax'),
+            secure: (process.env.COOKIE_SECURE === 'true') || isProd, // required when SameSite=None
             path: '/',
             maxAge: 24 * 60 * 60 * 1000
-        });
+        };
+
+        // In production, set a parent domain like ".wastewise.ph"
+        if (process.env.COOKIE_DOMAIN && process.env.COOKIE_DOMAIN !== 'localhost') {
+            cookieOptions.domain = process.env.COOKIE_DOMAIN; // e.g., ".wastewise.ph"
+        }
+
+        res.cookie('authToken', token, cookieOptions);
 
         console.log('[LOGIN] Set auth cookie for user:', user._id.toString(), 'token len:', token.length);
 
