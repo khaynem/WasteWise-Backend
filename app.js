@@ -25,7 +25,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser()); 
 
 app.use((req, res, next) => {
-  const allowedOrigins = [process.env.FRONTEND_URL];
+  const allowedOrigins = ['https://waste-wise-frontend-alpha.vercel.app/'];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
