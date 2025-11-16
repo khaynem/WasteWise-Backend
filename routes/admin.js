@@ -28,8 +28,8 @@ router.delete('/challenges/:id', authenticateToken(), challengeController.delete
 
 router.post('/user/role/update/:id', authenticateToken(), adminController.changeUserRole);
 
-router.get('/wastelog', authenticateToken(), adminController.getWasteLogs);
-router.post('/wastelog', authenticateToken(), adminController.addWasteLog);
-router.delete('/wastelog/:id', authenticateToken(), adminController.deleteWasteLog);
+router.get('/wastelogs', authenticateToken(), adminController.getWasteLogs);
+router.post('/wastelogs', authenticateToken(), adminController.addWasteLog);
+router.delete('/wastelogs/:id', authenticateToken(), adminController.deleteWasteLog);
 
 module.exports = router;
