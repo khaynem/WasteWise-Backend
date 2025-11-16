@@ -494,3 +494,83 @@ exports.changeUserRole = async (req, res) => {
         res.status(500).json({ message: 'Error changing user role', error: error.message });
     }
 }
+
+exports.addWasteLog = async (req, res) => { 
+    const userData = getValuesFromToken(req);
+
+    if (!userData) {
+        return res.status(401).json({ error: 'Invalid or expired token', token: userData });
+    }
+
+    const { wasteType, quantity, unit, date } = req.body;
+
+    if (!wasteType || !quantity || !unit || !date) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    try {
+        const wasteLog = new WasteLog({
+            recorder: userData.id,
+            wasteType,
+            quantity,
+            unit,
+            date
+        });
+        await wasteLog.save();
+
+        let qty = Number(quantity);
+        if (!Number.isFinite(qty) || qty <= 0) qty = 1;
+        const typeKey = String(wasteType || '').toLowerCase();
+        let multiplier = WASTE_POINTS.default;
+        for (const key of Object.keys(WASTE_POINTS)) {
+          if (key === 'default') continue;
+          if (typeKey.includes(key)) {
+            multiplier = WASTE_POINTS[key];
+            break;
+          }
+        }
+        const pointsToAdd = Math.max(1, Math.round(multiplier * qty));
+        const updatedRanking = await awardPointsToUser(userData.id, pointsToAdd);
+
+        res.status(201).json({ message: 'Waste log added successfully!', wasteLog, ranking: updatedRanking });
+    } catch (error) {
+        res.status(500).json({ message: 'Error adding waste log', error });
+    }
+};
+
+exports.getWasteLogs = async (req, res) => { 
+    const userData = getValuesFromToken(req);
+
+    if (!userData) {
+        return res.status(401).json({ error: 'Invalid or expired token', token: userData });
+    }
+
+    try {
+        const wasteLogs = await WasteLog.find({ recorder: userData.id });
+        res.status(200).json({ wasteLogs });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching waste logs', error });
+    }
+};
+
+exports.deleteWasteLog = async (req, res) => {
+  const userData = getValuesFromToken(req);
+  if (!userData) {
+    return res.status(401).json({ error: 'Invalid or expired token', token: userData });
+  }
+
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: 'Waste log ID is required' });
+  }
+
+  try {
+    const deleted = await WasteLog.findOneAndDelete({ _id: id, recorder: userData.id });
+    if (!deleted) {
+      return res.status(404).json({ error: 'Waste log not found' });
+    }
+    return res.status(200).json({ message: 'Waste log deleted successfully!', wasteLog: deleted });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error deleting waste log', error });
+  }
+};
