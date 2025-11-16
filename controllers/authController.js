@@ -151,19 +151,19 @@ exports.login = async (req, res) => {
         const isCrossSite = Boolean(originHost && originHost !== req.hostname);
 
         // SameSite strategy: cross-site requires 'None', same-site use 'Lax'
-        const sameSite = process.env.COOKIE_SAMESITE || (isCrossSite ? 'None' : 'Lax');
+        const sameSite = process.env.COOKIE_SAME_SITE || (isCrossSite ? 'None' : 'Lax');
         
         // Secure flag: required for SameSite=None, or when using HTTPS
         // const secure = process.env.COOKIE_SECURE
         const secure = (process.env.COOKIE_SECURE === 'true') || proto === 'https' || isProd;
 
-        // Domain: normalize for subdomain sharing (e.g., .wastewise.ph)
-        let domain;
-        if (process.env.COOKIE_DOMAIN && process.env.COOKIE_DOMAIN !== 'localhost') {
-            domain = process.env.COOKIE_DOMAIN.startsWith('.')
-                ? process.env.COOKIE_DOMAIN
-                : `.${process.env.COOKIE_DOMAIN}`;
-        }
+        // // Domain: normalize for subdomain sharing (e.g., .wastewise.ph)
+        // let domain;
+        // if (process.env.COOKIE_DOMAIN && process.env.COOKIE_DOMAIN !== 'localhost') {
+        //     domain = process.env.COOKIE_DOMAIN.startsWith('.')
+        //         ? process.env.COOKIE_DOMAIN
+        //         : `.${process.env.COOKIE_DOMAIN}`;
+        // }
 
         const cookieOptions = {
             httpOnly: false,
@@ -171,7 +171,7 @@ exports.login = async (req, res) => {
             secure,
             path: '/',
             maxAge: 24 * 60 * 60 * 1000,
-            ...(domain ? { domain } : {})
+            // ...(domain ? { domain } : {})
         };
 
         res.cookie('authToken', token, cookieOptions);
