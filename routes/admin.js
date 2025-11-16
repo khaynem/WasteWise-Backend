@@ -5,25 +5,27 @@ const { authenticateToken } = require('../services/jwt');
 const challengeController = require('../controllers/challengeController');
 
 // User management routes
-router.get('/users', authenticateToken('admin'), adminController.getAllUsers);
-router.patch('/users/:id/suspend', authenticateToken('admin'), adminController.suspendUser);
-router.patch('/users/:id/ban', authenticateToken('admin'), adminController.banUser);
-router.patch('/users/:id/activate', authenticateToken('admin'), adminController.activateUser);
+router.get('/users', authenticateToken(), adminController.getAllUsers);
+router.patch('/users/:id/suspend', authenticateToken(), adminController.suspendUser);
+router.patch('/users/:id/ban', authenticateToken(), adminController.banUser);
+router.patch('/users/:id/activate', authenticateToken(), adminController.activateUser);
 
 // Reports management routes
-router.get('/reports', authenticateToken('admin'), adminController.getAllReports);
-router.patch('/reports/:id/manage', authenticateToken('admin'), adminController.manageReport);
-router.get('/reports/download/pdf', authenticateToken('admin'), adminController.downloadReport);
+router.get('/reports', authenticateToken(), adminController.getAllReports);
+router.patch('/reports/:id/manage', authenticateToken(), adminController.manageReport);
+router.get('/reports/download/pdf', authenticateToken(), adminController.downloadReport);
 
 // Schedule management routes
-router.get('/schedules', authenticateToken('admin'), adminController.getAllSchedules);
-router.patch('/schedules/edit', authenticateToken('admin'), adminController.editSchedule);
+router.get('/schedules', authenticateToken(), adminController.getAllSchedules);
+router.patch('/schedules/edit', authenticateToken(), adminController.editSchedule);
 
 // Challenge management routes
-router.get('/challenges', authenticateToken('admin'), challengeController.getAllChallenges);
-router.get('/challenges/:id', authenticateToken('admin'), challengeController.getChallengeById);
-router.get('/challenges/:id/submissions', authenticateToken('admin'), challengeController.getSubmissionsForChallenge); // NEW
-router.post('/challenges', authenticateToken('admin'), challengeController.createChallenge);
-router.delete('/challenges/:id', authenticateToken('admin'), challengeController.deleteChallenge);
+router.get('/challenges', authenticateToken(), challengeController.getAllChallenges);
+router.get('/challenges/:id', authenticateToken(), challengeController.getChallengeById);
+router.get('/challenges/:id/submissions', authenticateToken(), challengeController.getSubmissionsForChallenge); // NEW
+router.post('/challenges', authenticateToken(), challengeController.createChallenge);
+router.delete('/challenges/:id', authenticateToken(), challengeController.deleteChallenge);
+
+router.post('/user/role/update/:id', authenticateToken(), adminController.changeUserRole);
 
 module.exports = router;

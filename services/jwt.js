@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 
-function authenticateToken(requiredRole) {
+function authenticateToken() {
     return async (req, res, next) => {
         try {
             const authHeader = req.headers['authorization'];
@@ -33,9 +33,9 @@ function authenticateToken(requiredRole) {
                     return res.status(403).json({ message: 'Email not verified. Please verify your email.' });
                 }
 
-                if (requiredRole && dbUser.role !== requiredRole) {
-                    return res.status(403).json({ message: `Insufficient role. Required: ${requiredRole}, Received: ${dbUser.role}` });
-                }
+                // if (requiredRole && dbUser.role !== requiredRole) {
+                //     return res.status(403).json({ message: `Insufficient role. Required: ${requiredRole}, Received: ${dbUser.role}` });
+                // }
 
                 req.user = {
                     id: dbUser._id.toString(),

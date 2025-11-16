@@ -6,28 +6,28 @@ const upload = multer();
 const { authenticateToken } = require('../services/jwt');
 const challengeController = require('../controllers/challengeController');
 
-router.get('/schedules', authenticateToken('user'), userController.getAllSchedules);
-router.get('/reports', authenticateToken('user'), userController.getAllReports);
+router.get('/schedules', authenticateToken(), userController.getAllSchedules);
+router.get('/reports', authenticateToken(), userController.getAllReports);
 
 // Add this endpoint for report creation
-router.post('/report', authenticateToken('user'), upload.single('image'), userController.setReport);
+router.post('/report', authenticateToken(), upload.single('image'), userController.setReport);
 
-router.patch('/report/:id', authenticateToken('user'), upload.single('image'), userController.editReport);
+router.patch('/report/:id', authenticateToken(), upload.single('image'), userController.editReport);
 
-router.post('/wastelog', authenticateToken('user'), userController.addWasteLog);
-router.get('/wastelogs', authenticateToken('user'), userController.getWasteLogs);
-router.delete('/wastelog/:id', authenticateToken('user'), userController.deleteWasteLog);
+router.post('/wastelog', authenticateToken(), userController.addWasteLog);
+router.get('/wastelogs', authenticateToken(), userController.getWasteLogs);
+router.delete('/wastelog/:id', authenticateToken(), userController.deleteWasteLog);
 
-router.get('/leaderboard', authenticateToken('user'), userController.getLeaderboard);
+router.get('/leaderboard', authenticateToken(), userController.getLeaderboard);
 
-router.get('/challenges', authenticateToken('user'), challengeController.getAllChallenges);
-router.get('/challenges/:id', authenticateToken('user'), challengeController.getChallengeById);
-router.post('/challenges/submit/:challengeId', authenticateToken('user'), upload.single('image'), challengeController.submitEntry);
+router.get('/challenges', authenticateToken(), challengeController.getAllChallenges);
+router.get('/challenges/:id', authenticateToken(), challengeController.getChallengeById);
+router.post('/challenges/submit/:challengeId', authenticateToken(), upload.single('image'), challengeController.submitEntry);
 
 //profile management
-router.get('/profile', authenticateToken('user'), userController.viewCompleteProfile);
-router.patch('/profile', authenticateToken('user'), userController.editProfile);
-router.patch('/profile/password', authenticateToken('user'), userController.changePassword);
-router.delete('/profile', authenticateToken('user'), userController.deleteAccount);
+router.get('/profile', authenticateToken(), userController.viewCompleteProfile);
+router.patch('/profile', authenticateToken(), userController.editProfile);
+router.patch('/profile/password', authenticateToken(), userController.changePassword);
+router.delete('/profile', authenticateToken(), userController.deleteAccount);
 
 module.exports = router;
