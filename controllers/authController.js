@@ -166,7 +166,7 @@ exports.login = async (req, res) => {
         // }
 
         const cookieOptions = {
-            httpOnly: false,
+            httpOnly: true,
             sameSite,
             secure,
             path: '/',
@@ -279,6 +279,104 @@ exports.resetPassword = async (req, res) => {
         resetTokens.delete(token);
 
         return res.status(200).json({ message: 'Password reset successful' });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+exports.checkAuth = async (req, res) => {
+    try {
+        const token = req.cookies?.authToken;
+        
+        if (!token) {
+            return res.status(401).json({ 
+                authenticated: false, 
+                message: 'No token provided',
+                code: 401 
+            });
+        }
+
+        jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+            if (err) {
+                return res.status(403).json({ 
+                    authenticated: false, 
+                    message: 'Invalid or expired token',
+                    code: 403 
+                });
+            }
+
+            try {
+                const user = await userModel.findById(decoded.id).select('-password -emailToken').lean();
+                
+                if (!user) {
+                    return res.status(404).json({ 
+                        authenticated: false, 
+                        message: 'User not found',
+                        code: 404 
+                    });
+                }
+
+                if (!user.verified) {
+                    return res.status(403).json({ 
+                        authenticated: false, 
+                        message: 'Email not verified',
+                        code: 403 
+                    });
+                }
+
+                const status = String(user.status || '').toLowerCase();
+                if (status && status !== 'active') {
+                    return res.status(403).json({ 
+                        authenticated: false, 
+                        message: `Account is ${user.status}`,
+                        code: 403 
+                    });
+                }
+
+                return res.status(200).json({
+                    authenticated: true,
+                    user: {
+                        id: user._id.toString(),
+                        username: user.username,
+                        email: user.email,
+                        role: user.role,
+                        status: user.status,
+                        verified: user.verified,
+                        joinDate: user.joinDate,
+                        lastLogin: user.lastLogin
+                    },
+                    code: 200
+                });
+            } catch (dbError) {
+                return res.status(500).json({ 
+                    authenticated: false, 
+                    message: 'Database error',
+                    code: 500 
+                });
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ 
+            authenticated: false, 
+            error: error.message,
+            code: 500 
+        });
+    }
+};
+
+exports.logout = async (req, res) => {
+    try {
+        res.clearCookie('authToken', {
+            httpOnly: true,
+            sameSite: process.env.COOKIE_SAME_SITE || 'Lax',
+            secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production',
+            path: '/'
+        });
+
+        return res.status(200).json({ 
+            message: 'Logged out successfully',
+            code: 200 
+        });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }
