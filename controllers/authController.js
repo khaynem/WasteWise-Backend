@@ -154,6 +154,7 @@ exports.login = async (req, res) => {
         const sameSite = process.env.COOKIE_SAMESITE || (isCrossSite ? 'None' : 'Lax');
         
         // Secure flag: required for SameSite=None, or when using HTTPS
+        // const secure = process.env.COOKIE_SECURE
         const secure = (process.env.COOKIE_SECURE === 'true') || proto === 'https' || isProd;
 
         // Domain: normalize for subdomain sharing (e.g., .wastewise.ph)
@@ -165,7 +166,7 @@ exports.login = async (req, res) => {
         }
 
         const cookieOptions = {
-            httpOnly: true,
+            httpOnly: false,
             sameSite,
             secure,
             path: '/',
