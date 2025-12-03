@@ -7,6 +7,8 @@ const submissionSchema = new mongoose.Schema({
     username: { type: String, required: true },
     proof: { type: String, required: true },
     description: { type: String, required: true },
+    status: { type: String, enum: ['Pending', 'Approved'], default: 'Pending' },
+    rewardedAt: { type: Date },
     submittedAt: { type: Date, default: Date.now }
 })
 

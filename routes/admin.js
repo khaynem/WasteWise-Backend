@@ -22,9 +22,10 @@ router.patch('/schedules/edit', authenticateToken(), adminController.editSchedul
 // Challenge management routes
 router.get('/challenges', authenticateToken(), challengeController.getAllChallenges);
 router.get('/challenges/:id', authenticateToken(), challengeController.getChallengeById);
-router.get('/challenges/:id/submissions', authenticateToken(), challengeController.getSubmissionsForChallenge); // NEW
+router.get('/challenges/:id/submissions', authenticateToken(), challengeController.getSubmissionsForChallenge);
 router.post('/challenges', authenticateToken(), challengeController.createChallenge);
 router.delete('/challenges/:id', authenticateToken(), challengeController.deleteChallenge);
+router.post('/submissions/:submissionId/reward', authenticateToken(), challengeController.rewardSubmission);
 
 router.post('/user/role/update/:id', authenticateToken(), adminController.changeUserRole);
 

@@ -6,6 +6,7 @@ const WasteLog = require('../models/wastelogModel');
 const Ranking = require('../models/rankingModel');
 const User = require('../models/userModel');
 const bcrypt = require('bcrypt');
+const { analyzeImage } = require('../services/bytez');
 
 // Simple points mapping by waste type (multiplier per unit)
 const WASTE_POINTS = {
@@ -48,6 +49,52 @@ exports.getAllSchedules = async (req, res) => {
         res.status(500).json({ message: 'Error fetching schedules', error });
     }
 }
+
+exports.analyzeReportImage = async (req, res) => {
+  const userData = getValuesFromToken(req);
+
+  if (!userData) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file provided.' });
+    }
+
+    // Upload to Cloudinary first
+    const uploadResult = await new Promise((resolve, reject) => {
+      const mockRes = {
+        status: (code) => ({
+          json: (data) => {
+            if (code === 200) resolve(data);
+            else reject(data);
+          }
+        })
+      };
+      cloudinaryController.upToCloudinary(req, mockRes);
+    });
+
+    // Analyze the uploaded image
+    const { error, output } = await analyzeImage(uploadResult.imageUrl);
+
+    if (error) {
+      return res.status(500).json({ 
+        message: 'Error analyzing image', 
+        error,
+        imageUrl: uploadResult.imageUrl 
+      });
+    }
+
+    res.status(200).json({ 
+      imageUrl: uploadResult.imageUrl,
+      description: output,
+      message: 'Image analyzed successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error processing image', error });
+  }
+};
 
 exports.setReport = async (req, res) => { 
     const userData = getValuesFromToken(req);

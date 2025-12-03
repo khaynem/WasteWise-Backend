@@ -1,10 +1,12 @@
 const userModel = require('../models/userModel');
 const bcrypt = require('bcrypt');
+const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const mailer = require('../services/mailer'); 
 const rank = require('../models/rankingModel');
 
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const resetTokens = new Map();
 
@@ -34,8 +36,8 @@ exports.signup = async (req, res) => {
             password: hashedPass,
             verified: false,
             emailToken,
-            joinDate: now,        // explicit (model already has default)
-            lastLogin: null       // explicit initial state
+            joinDate: now,
+            lastLogin: null
         });
         await user.save();
 
@@ -128,7 +130,6 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials', code: 400 });
         }
 
-        // Update lastLogin timestamp
         user.lastLogin = new Date();
         await user.save();
 
@@ -138,40 +139,21 @@ exports.login = async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        // Enhanced cookie options
         const isProd = process.env.NODE_ENV === 'production';
-        
-        // Detect protocol behind proxies (Cloudflare, nginx, etc.)
         const proto = String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')).toLowerCase();
-        
-        // Check if request is cross-origin
         const originHost = (() => {
             try { return new URL(req.headers.origin || '').hostname; } catch { return ''; }
         })();
         const isCrossSite = Boolean(originHost && originHost !== req.hostname);
-
-        // SameSite strategy: cross-site requires 'None', same-site use 'Lax'
         const sameSite = process.env.COOKIE_SAME_SITE || (isCrossSite ? 'None' : 'Lax');
-        
-        // Secure flag: required for SameSite=None, or when using HTTPS
-        // const secure = process.env.COOKIE_SECURE
         const secure = (process.env.COOKIE_SECURE === 'true') || proto === 'https' || isProd;
-
-        // // Domain: normalize for subdomain sharing (e.g., .wastewise.ph)
-        // let domain;
-        // if (process.env.COOKIE_DOMAIN && process.env.COOKIE_DOMAIN !== 'localhost') {
-        //     domain = process.env.COOKIE_DOMAIN.startsWith('.')
-        //         ? process.env.COOKIE_DOMAIN
-        //         : `.${process.env.COOKIE_DOMAIN}`;
-        // }
 
         const cookieOptions = {
             httpOnly: true,
             sameSite,
             secure,
             path: '/',
-            maxAge: 24 * 60 * 60 * 1000,
-            // ...(domain ? { domain } : {})
+            maxAge: 24 * 60 * 60 * 1000
         };
 
         res.cookie('authToken', token, cookieOptions);
@@ -199,15 +181,11 @@ exports.forgotPassword = async (req, res) => {
         const user = await userModel.findOne({ email });
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        // Generate token
         const token = crypto.randomBytes(32).toString('hex');
-        // Store token and expiry in memory
-        resetTokens.set(token, { userId: user._id, expires: Date.now() + 3600000 }); // 1 hour
+        resetTokens.set(token, { userId: user._id, expires: Date.now() + 3600000 });
 
-        // Build reset link (adjust frontend URL as needed)
         const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${token}`;
 
-        // Send email
         await mailer.sendMail({
             from: process.env.EMAIL_USER,
             to: email,
@@ -400,7 +378,7 @@ exports.verifyEmail = async (req, res) => {
         if (user.verified) {
             console.log('[VERIFY] User already verified:', user._id.toString());
             if (process.env.FRONTEND_URL) {
-                return res.redirect(`${process.env.FRONTEND_URL}/email-verified`);
+                return res.redirect(`${process.env.FRONTEND_URL}/email-verified?status=already`);
             }
             return res.status(200).json({ message: 'Email already verified.' });
         }
@@ -414,11 +392,160 @@ exports.verifyEmail = async (req, res) => {
         console.log('[VERIFY] Email verified for user:', user._id.toString());
 
         if (process.env.FRONTEND_URL) {
-            return res.redirect(`${process.env.FRONTEND_URL}/email-verified`);
+            return res.redirect(`${process.env.FRONTEND_URL}/email-verified?status=success`);
         }
         return res.status(200).json({ message: 'Email verified successfully!' });
     } catch (error) {
         console.error('[VERIFY] Error:', error);
         return res.status(500).json({ error: error.message });
     }
+};
+
+exports.googleAuth = async (req, res) => {
+  try {
+    const { id_token, action } = req.body;
+    console.log('[googleAuth] action=', action);
+
+    if (!id_token) {
+      return res.status(400).json({ message: 'Missing id_token', code: 400 });
+    }
+
+    // Verify the Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: id_token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      return res.status(400).json({ message: 'Invalid Google token', code: 400 });
+    }
+
+    const email = payload.email.toLowerCase().trim();
+    const googleId = payload.sub;
+    const name = payload.name || email.split('@')[0];
+    const avatar = payload.picture;
+
+    console.log('[googleAuth] payload email=', email, 'sub=', googleId, 'action=', action);
+
+    // Find existing user
+    let user = await userModel.findOne({ email });
+
+    // Handle Create Account flow
+    if (action === 'create') {
+      // Check if user already exists
+      if (user) {
+        console.log('[googleAuth] User already exists during create action');
+        return res.status(409).json({ 
+          message: 'An account with this email already exists. Please use Sign In instead.', 
+          code: 409 
+        });
+      }
+
+      // Create new user with Google account
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 15);
+      
+      user = new userModel({
+        username: name,
+        email,
+        password: hashedPassword,
+        verified: true, // Google accounts are pre-verified
+        role: 'user',
+        googleId,
+        avatar,
+        joinDate: new Date(),
+        lastLogin: new Date()
+      });
+      await user.save();
+      
+      console.log('[googleAuth] Created new user via Google id=', user._id.toString());
+
+    } 
+    // Handle Sign In flow
+    else if (action === 'signin') {
+      // User must exist to sign in
+      if (!user) {
+        console.log('[googleAuth] No account found during signin action');
+        return res.status(404).json({ 
+          message: 'No account found with this email. Please create an account first.', 
+          code: 404 
+        });
+      }
+
+      // Check if account is active
+      const status = String(user.status || '').toLowerCase();
+      if (status && status !== 'active') {
+        return res.status(403).json({ 
+          message: `Account is ${user.status}. Contact support.`, 
+          code: 403 
+        });
+      }
+
+      // Link Google ID if not already linked
+      if (!user.googleId) {
+        user.googleId = googleId;
+        if (avatar && !user.avatar) user.avatar = avatar;
+      }
+      
+      // Update last login
+      user.lastLogin = new Date();
+      await user.save();
+      
+      console.log('[googleAuth] User signed in via Google id=', user._id.toString());
+
+    } else {
+      return res.status(400).json({ 
+        message: 'Invalid action. Must be "create" or "signin".', 
+        code: 400 
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id.toString(), username: user.username, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    // Set cookie with appropriate settings
+    const isProd = process.env.NODE_ENV === 'production';
+    const proto = String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')).toLowerCase();
+    const originHost = (() => { 
+      try { return new URL(req.headers.origin || '').hostname; } 
+      catch { return ''; } 
+    })();
+    const isCrossSite = Boolean(originHost && originHost !== req.hostname);
+    const sameSite = process.env.COOKIE_SAME_SITE || (isCrossSite ? 'None' : 'Lax');
+    const secure = (process.env.COOKIE_SECURE === 'true') || proto === 'https' || isProd;
+
+    const cookieOptions = {
+      httpOnly: true,
+      sameSite,
+      secure,
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000
+    };
+
+    res.clearCookie('authToken', { path: '/' });
+    res.cookie('authToken', token, cookieOptions);
+
+    console.log('[googleAuth] Success - user=', user.email, 'role=', user.role, 'action=', action);
+    
+    return res.status(200).json({ 
+      code: 200, 
+      role: user.role || 'user', 
+      userId: user._id.toString(),
+      message: action === 'create' ? 'Account created successfully' : 'Signed in successfully'
+    });
+
+  } catch (err) {
+    console.error('[googleAuth] error', err);
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ message: err.message, code: 400 });
+    }
+    return res.status(500).json({ 
+      message: 'Google authentication failed. Please try again.', 
+      code: 500 
+    });
+  }
 };
